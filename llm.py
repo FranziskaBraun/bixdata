@@ -62,9 +62,9 @@ def get_user_prompt(picture_description, delayed_recall):
     - Ein Haus in der Ferne
     
     Ihre Aufgabe darin, anhand der Bildbeschreibung und des verzögerten Recalls den kognitiven Status der Person in eine der drei Kategorien zu klassifizieren:
-    - NCI = keine kognitiven Beeinträchtigung (No Cognitive Impairment)
-    - MCI = leichte kognitive Beeinträchtigung (Mild Cognitive Impairment)
-    - DEM = mittlere bis schwere kognitive Beeinträchtigung (Dementia)
+    - NCI = No Cognitive Impairment
+    - MCI = Mild Cognitive Impairment
+    - DEM = Mild to Severe Dementia
     
     Hier ist die Bildbeschreibung:
     \"\"\"{picture_description}\"\"\"
@@ -94,9 +94,9 @@ def get_user_prompt_story(story_reading, delayed_recall):
     Johanna ärgerte sich."
 
     Ihre Aufgabe besteht darin, anhand der vorgelsenen Geschichte und des verzögerten Recalls den kognitiven Status der Person in eine der drei Kategorien zu klassifizieren:
-    - NCI = keine kognitiven Beeinträchtigung (No Cognitive Impairment)
-    - MCI = leichte kognitive Beeinträchtigung (Mild Cognitive Impairment)
-    - DEM = mittlere bis schwere kognitive Beeinträchtigung (Dementia)
+    - NCI = No Cognitive Impairment
+    - MCI = Mild Cognitive Impairment
+    - DEM = Mild to Severe Dementia
 
     Hier ist die vorgelesene Geschichte:
     \"\"\"{story_reading}\"\"\"
@@ -183,7 +183,7 @@ story_reading_paths = [t for t in base_path.glob('**/*h6uxbwun*.txt')]
 recall_story_reading_paths = [t for t in base_path.glob('**/*yt1y8hou*.txt')]
 
 resps = []
-for sid, task_path, recall_path in tqdm(get_matches(story_reading_paths, recall_story_reading_paths), desc="Processing subjects"):
+for sid, task_path, recall_path in tqdm(get_matches(picture_description_paths, recall_picture_description_paths), desc="Processing subjects"):
     task = load_text_file(task_path)
     recall = load_text_file(recall_path)
 
@@ -200,7 +200,7 @@ for sid, task_path, recall_path in tqdm(get_matches(story_reading_paths, recall_
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": get_user_prompt_story(task, recall)},
+                {"type": "text", "text": get_user_prompt(task, recall)},
                 # {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}},  # Bild übergeben
             ],
         },
@@ -212,7 +212,7 @@ for sid, task_path, recall_path in tqdm(get_matches(story_reading_paths, recall_
     resps.append(response_json)
 
 results = pd.DataFrame(resps)
-results.to_csv(f'{base_path}/bix_llm_story_reading_{model.split("/")[1]}.csv', index=False)
+results.to_csv(f'{base_path}/bix_llm_picture_description_{model.split("/")[1]}_v2.csv', index=False)
 
 
 
