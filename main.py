@@ -5,11 +5,13 @@ import jiwer
 from num2words import num2words
 from utils import get_german_hesitations
 from bixdata.dataloading import load_meta_data
+import chardet
 
 # ---------- Konfiguration ----------
+model = "owsm"
 gold_dir = "bix-txt"      # Ordner mit Gold-Transkripten (.txt)
-asr_dir = "bix-whisper"        # Ordner mit ASR-Outputs (.txt)
-output_csv = "wer_results.csv"
+asr_dir = f"bix-{model}"        # Ordner mit ASR-Outputs (.txt)
+output_csv = f"{model}_wer_results.csv"
 encoding = "utf-8"
 # ---------- Ende Konfiguration ----------
 
@@ -31,6 +33,7 @@ FILLER_RE = re.compile(
 NOISE_RE = re.compile(r"\b(musik|applaus|lachen|geräusch|noise|unk|vielen dank|untertitelung des zdf)\b", re.IGNORECASE)
 NUMBER_RE = re.compile(r"\b\d+\b")
 YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
+
 
 def normalize_text(s: str) -> str:
     t = s
@@ -56,6 +59,7 @@ def normalize_text(s: str) -> str:
         except Exception:
             return m.group()
     t = NUMBER_RE.sub(num_to_words, t)
+    t = YEAR_RE.sub("", t)
     # lowercase + normalize spaces
     t = t.lower()
     t = MULTI_SPACE_RE.sub(" ", t).strip()
@@ -79,56 +83,26 @@ def main():
         print(f"ref={ref}")
         print(f"hyp={hyp}")
 
-        if ref and hyp:
-            # normal case
-            m = jiwer.compute_measures([ref], [hyp])
+        # skip empty files
+        if not ref:
+            continue
 
-        elif not ref and not hyp:
-            # both empty → perfect match
-            m = {
-                "wer": 0.0,
-                "substitutions": 0,
-                "deletions": 0,
-                "insertions": 0,
-                "hits": 0,
-            }
-
-        elif ref and not hyp:
-            # reference non-empty, hypothesis empty → everything deleted
-            ref_words = ref.split()
-            m = {
-                "wer": 1.0,
-                "substitutions": 0,
-                "deletions": len(ref_words),
-                "insertions": 0,
-                "hits": 0,
-            }
-
-        elif not ref and hyp:
-            # reference empty, hypothesis non-empty → everything inserted
-            hyp_words = hyp.split()
-            m = {
-                "wer": 1.0,
-                "substitutions": 0,
-                "deletions": 0,
-                "insertions": len(hyp_words),
-                "hits": 0,
-            }
+        m = jiwer.compute_measures([ref], [hyp])
 
         rows.append({
             "subject": int(fn.split("_")[1]),
             "test": fn.split("_")[2],
-            "center": int(fn.split("_")[3]),
+            "tester": int(fn.split("_")[3]),
             "assessment": fn.split("_")[5],
             "timestamp": fn.split("_")[6],
             "filename": fn,
-            "wer": m["wer"],
-            "substitutions": m["substitutions"],
-            "deletions": m["deletions"],
-            "insertions": m["insertions"],
-            "hits": m["hits"],
-            "reference": ref,
-            "hypothesis": hyp,
+            f"{model}_wer": m["wer"],
+            f"{model}_substitutions": m["substitutions"],
+            f"{model}_deletions": m["deletions"],
+            f"{model}_insertions": m["insertions"],
+            f"{model}_hits": m["hits"],
+            f"{model}_reference": ref,
+            f"{model}_hypothesis": hyp,
         })
 
         print(f"{fn}: WER={m['wer']:.4f}")
@@ -137,10 +111,35 @@ def main():
     print(f"\nErgebnisse gespeichert in {output_csv}")
 
 
+def to_utf8(directory):
+    for filename in os.listdir(directory):
+        if filename.endswith(".json"):
+            path = os.path.join(directory, filename)
+            with open(path, "rb") as f:
+                raw_data = f.read()
+
+            detected = chardet.detect(raw_data)
+            enc = detected["encoding"]
+            print(f"Converting {filename} from {enc} to UTF-8")
+
+            try:
+                text = raw_data.decode(enc)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+            except Exception as e:
+                print(f"⚠️ Skipping {filename}: {e}")
+
+
 if __name__ == "__main__":
-    main()
-    meta, _ = load_meta_data("audio_data_bix/metadata")
-    wer = pd.read_csv("wer_results.csv")
-    merged = meta.merge(wer, on='subject', how='inner').sort_values(by=['subject']).reset_index(drop=True)
+    # to_utf8("audio_data_bix/metadata3")
+    # main()
+    meta, _ = load_meta_data("audio_data_bix/metadata3")
+    wer_whisper = pd.read_csv("whisper_wer_results.csv")
+    wer_owsm = pd.read_csv("owsm_wer_results.csv")
+    wer_parakeet = pd.read_csv("parakeet_wer_results.csv")
+    merged = meta.merge(wer_whisper, on='subject', how='inner')
+    merged = merged.merge(wer_owsm, on='filename', how='inner')
+    merged = merged.merge(wer_parakeet, on='filename', how='inner')
+    merged = merged.sort_values(by=['subject']).reset_index(drop=True)
     pd.DataFrame(merged).to_csv("bix_wer.csv", index=False, encoding="utf-8")
-    print()
+    print("Finished")
