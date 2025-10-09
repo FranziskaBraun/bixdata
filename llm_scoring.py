@@ -8,7 +8,6 @@ from openai import OpenAI
 from pydantic import BaseModel
 from typing import Literal, Optional
 from tqdm import tqdm
-import re
 
 
 # Define JSON schema for structured output
@@ -46,6 +45,7 @@ print(f"Using model: {model}")
 # Create JSON schema for output constraint
 json_schema = CognitiveAssessment.model_json_schema()
 
+
 # Build prompt for classification
 # den Text in Bezug auf Kohärenz (text_coherence), lexikalische Vielfalt (lexical_diversity), Satzlänge (sentence_length) und Wortfindungsschwierigkeiten (word_finding_difficulties) mit Hilfe von Punkten zwischen 0 und 1 zu bewerten.
 def get_user_prompt(picture_description, delayed_recall):
@@ -62,18 +62,18 @@ def get_user_prompt(picture_description, delayed_recall):
     - Ein Mädchen fällt ins Wasser
     - Gewitterwolken mit Blitzen
     - Ein Haus in der Ferne
-    
+
     Ihre Aufgabe darin, anhand der Bildbeschreibung und des verzögerten Recalls den kognitiven Status der Person in eine der drei Kategorien zu klassifizieren:
     - NCI = No Cognitive Impairment
     - MCI = Mild Cognitive Impairment
     - DEM = Mild to Severe Dementia
-    
+
     Hier ist die Bildbeschreibung:
     \"\"\"{picture_description}\"\"\"
-    
+
     Hier ist der verzögerte Recall:
     \"\"\"{delayed_recall}\"\"\"
-    
+
     Geben Sie die Bewertung NUR im JSON-Format entsprechend des gegebenen Schemas an. Keine anderen Ausgaben.
     """
     return prompt
@@ -140,12 +140,11 @@ def get_response(messages):
     # max_tokens=16384,
     # temperature=0.01  # phi4
     # temperature=1.0, top_p=0.9  # qwen_omni
-
-    content = response.choices[0].message.content
-    reasoning_content = response.choices[0].message.reasoning_content
+    content = response.choices[0].message.content.strip()
+    reasoning_content = response.choices[0].message.reasoning_content.strip()
     print(content if content is not None else reasoning_content)
     # return response.choices[0].message.reasoning_content.strip()
-    return content.strip() if content is not None else reasoning_content.strip()
+    return content if content is not None else reasoning_content
 
 
 def load_json(js, i=""):
@@ -157,30 +156,6 @@ def load_json(js, i=""):
         print(f"JSON decoding failed: {e}")
         print(f"Problematic response: {js}")
         return None
-
-
-def safe_parse_json(text):
-    """
-    Extrahiert und parsed JSON aus LLM-Antworten sicher.
-    Entfernt Markdown, Backticks und whitespace.
-    Gibt {} zurück, wenn Parsing fehlschlägt.
-    """
-    if not text:
-        return {}
-
-    # JSON-Block extrahieren, falls in ```json ... ``` eingebettet
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        text = match.group(0)
-
-    # Whitespace entfernen
-    text = text.strip()
-
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        print(f"JSON decoding failed. Problematic response:\n{text}\n")
-        return {}
 
 
 def extract_subject_id(path: Path) -> str:
@@ -215,7 +190,8 @@ story_reading_paths = [t for t in base_path.glob('**/*h6uxbwun*.txt')]
 recall_story_reading_paths = [t for t in base_path.glob('**/*yt1y8hou*.txt')]
 
 resps = []
-for sid, task_path, recall_path in tqdm(get_matches(picture_description_paths, recall_picture_description_paths), desc="Processing subjects"):
+for sid, task_path, recall_path in tqdm(get_matches(picture_description_paths, recall_picture_description_paths),
+                                        desc="Processing subjects"):
     task = load_text_file(task_path)
     recall = load_text_file(recall_path)
 
@@ -225,9 +201,8 @@ for sid, task_path, recall_path in tqdm(get_matches(picture_description_paths, r
         {
             "role": "system",
             "content": (
-                "You are a precise clinical language model that classifies cognitive status."
-                "First draft your thinking process (inner monologue) until you arrive at a response. Format your response using JSON. Write both your thoughts and the response in the same language as the input."
-                "Your thinking process must follow the template below:[THINK]Your thoughts or/and draft, like working through an exercise on scratch paper. Be as casual and as long as you want until you are confident to generate the response. Use the same language as the input.[/THINK] Here, provide a JSON object that strictly follows this schema:\n" + str(json_schema)
+                "Sie sind ein präzises klinisches Sprachmodell, das den kognitiven Status klassifiziert."
+                "Sie müssen ein JSON-Objekt zurückgeben, das sich strikt an dieses Schema hält:\n" + str(json_schema)
             ),
         },
         {
@@ -240,19 +215,19 @@ for sid, task_path, recall_path in tqdm(get_matches(picture_description_paths, r
     ]
 
     response_pred = get_response(messages)
-    pred_json = safe_parse_json(response_pred)
-    if pred_json == {}:
-        continue
+    pred_json = load_json(response_pred)
     response_json = {**response_json, **pred_json}
     resps.append(response_json)
 
 results = pd.DataFrame(resps)
 results.to_csv(f'{base_path}/bix_llm_picture_description_{model.split("/")[1]}.csv', index=False)
 
-# "First draft your thinking process (inner monologue) until you arrive at a response. Format your response using Markdown, and use LaTeX for any mathematical equations. Write both your thoughts and the response in the same language as the input."
-# "Your thinking process must follow the template below:[THINK]Your thoughts or/and draft, like working through an exercise on scratch paper. Be as casual and as long as you want until you are confident to generate the response. Use the same language as the input.[/THINK]Here, provide a self-contained response in JSON object."
-# "You are a precise clinical language model that classifies cognitive status. "\
-# "You must return a JSON object that strictly follows this schema:\n" + str(json_schema)
-
 # "Sie sind ein präzises klinisches Sprachmodell, das den kognitiven Status klassifiziert."
 # "Sie müssen ein JSON-Objekt zurückgeben, das sich strikt an dieses Schema hält:\n" + str(json_schema)
+# #
+# #
+# #
+# "First draft your thinking process (inner monologue) until you arrive at a response. Format your response using Markdown, and use LaTeX for any mathematical equations. Write both your thoughts and the response in the same language as the input."
+# "Your thinking process must follow the template below:[THINK]Your thoughts or/and draft, like working through an exercise on scratch paper. Be as casual and as long as you want until you are confident to generate the response. Use the same language as the input.[/THINK]Here, provide a self-contained response."
+# "You are a precise clinical language model that classifies cognitive status. "
+# "You must return a JSON object that strictly follows this schema:\n" + str(json_schema)
