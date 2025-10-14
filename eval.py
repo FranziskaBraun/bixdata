@@ -9,7 +9,7 @@ from sklearn.metrics import (
 
 # Deine bisherigen Zeilen
 meta, _ = load_meta_data("audio_data_bix/metadata3")
-result_picture = pd.read_csv("results/bix_llm_story_reading_Mistral-Small-3.2-24B-Instruct-2506.csv")
+result_picture = pd.read_csv("results/bix_llm_picture_description_Mistral-Small-3.2-24B-Instruct-2506_only.csv")[['subject', "cognitive_status"]]
 merged = meta.merge(result_picture, on='subject', how='inner').sort_values(by=['subject']).reset_index(drop=True)
 
 # -------------------------
@@ -18,7 +18,7 @@ merged = meta.merge(result_picture, on='subject', how='inner').sort_values(by=['
 rename_map = {
     "patient_dat": "DEM",
     "patient_mci": "MCI",
-    "control": "NCI"
+    "control": "HC"
 }
 
 merged["type"] = merged["type"].replace(rename_map)
@@ -30,11 +30,11 @@ y_true = merged["type"]
 y_pred = merged["cognitive_status"]
 
 # (a) Confusion Matrix
-cm = confusion_matrix(y_true, y_pred, labels=["NCI", "MCI", "DEM"])
+cm = confusion_matrix(y_true, y_pred, labels=["HC", "MCI", "DEM"])
 cm_df = pd.DataFrame(cm, index=["True_NCI", "True_MCI", "True_DEM"], columns=["Pred_NCI", "Pred_MCI", "Pred_DEM"])
 
 # (b) Report
-report = classification_report(y_true, y_pred, labels=["NCI", "MCI", "DEM"], digits=3, output_dict=True)
+report = classification_report(y_true, y_pred, labels=["HC", "MCI", "DEM"], digits=3, output_dict=True)
 report_df = pd.DataFrame(report).transpose()
 
 # (c) Accuracy
@@ -44,7 +44,7 @@ bal_acc = balanced_accuracy_score(y_true, y_pred)
 # -------------------------
 # 3️⃣ Ausgabe
 # -------------------------
-print("✅ Klassifikationsmetriken (Mistral Geschichte Lesen)\n")
+print("✅ Klassifikationsmetriken (Mistral Geschichte + Recall)\n")
 print("Confusion Matrix:")
 print(cm_df, "\n")
 print("Classification Report:")

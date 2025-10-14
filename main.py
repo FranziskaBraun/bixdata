@@ -127,19 +127,26 @@ def to_utf8(directory):
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(text)
             except Exception as e:
-                print(f"⚠️ Skipping {filename}: {e}")
+                print(f"Skipping {filename}: {e}")
 
 
 if __name__ == "__main__":
     # to_utf8("audio_data_bix/metadata3")
     # main()
-    meta, _ = load_meta_data("audio_data_bix/metadata3")
-    wer_whisper = pd.read_csv("whisper_wer_results.csv")
-    wer_owsm = pd.read_csv("owsm_wer_results.csv")
-    wer_parakeet = pd.read_csv("parakeet_wer_results.csv")
-    merged = meta.merge(wer_whisper, on='subject', how='inner')
-    merged = merged.merge(wer_owsm, on='filename', how='inner')
-    merged = merged.merge(wer_parakeet, on='filename', how='inner')
+    meta, asses = load_meta_data("audio_data_bix/metadata3")
+    meta = meta.sort_values(by=['subject']).reset_index(drop=True)
+    result_picture = pd.read_csv("results/bix_llm_picture_description_Mistral-Small-3.2-24B-Instruct-2506.csv")
+    # result_story = pd.read_csv("results/bix_llm_story_reading_Mistral-Small-3.2-24B-Instruct-2506.csv")
+    merged = meta.merge(result_picture, on='subject', how='inner')
+    # merged = merged.merge(result_story, on='subject', how='inner')
     merged = merged.sort_values(by=['subject']).reset_index(drop=True)
-    pd.DataFrame(merged).to_csv("bix_wer.csv", index=False, encoding="utf-8")
+
+    # wer_whisper = pd.read_csv("whisper_wer_results.csv")
+    # wer_owsm = pd.read_csv("owsm_wer_results.csv")
+    # wer_parakeet = pd.read_csv("parakeet_wer_results.csv")
+    # merged = meta.merge(wer_whisper, on='subject', how='inner')
+    # merged = merged.merge(wer_owsm, on='filename', how='inner')
+    # merged = merged.merge(wer_parakeet, on='filename', how='inner')
+    # merged = merged.sort_values(by=['subject']).reset_index(drop=True)
+    # pd.DataFrame(merged).to_csv("bix_wer.csv", index=False, encoding="utf-8")
     print("Finished")

@@ -2,7 +2,7 @@ import json
 import os
 
 # Define the result directory containing JSON files
-result_dir = "./audio_data_bix/audio_processed/result"
+result_dir = "./audio_data_bix/empty/result"
 
 # Ensure the directory exists
 if not os.path.exists(result_dir):
@@ -22,7 +22,7 @@ for filename in os.listdir(result_dir):
             # Extract transcript text
             text = ""
             for result in data['result']:
-                text += result['transcript'] + " "
+                text += result['transcript_formatted'] + " "
 
             # Define the output TXT file path (same directory as JSON)
             txt_path = os.path.splitext(json_path)[0] + ".txt"
